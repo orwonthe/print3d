@@ -3,7 +3,7 @@ from solid import cylinder, rotate, cube, union, scale
 from solid.utils import up, scad_render_to_file, left, right, forward, back
 
 DEFAULT_HOLDER_THICKNESS = 0.06 @ inches
-DEFAULT_PEG_DIAMETER = 0.245 @ inches
+DEFAULT_PEG_DIAMETER = 0.25 @ inches
 DEFAULT_PEGBOARD_CLEARANCE = 0.25 @ inches
 DEFAULT_CONTAINER_CLEARANCE = DEFAULT_HOLDER_THICKNESS
 DEFAULT_CLEARANCE = DEFAULT_PEGBOARD_CLEARANCE + DEFAULT_CONTAINER_CLEARANCE
@@ -56,7 +56,7 @@ def slot_peg_with_catch(
         overreach = diameter
     peg = solid_peg(diameter=diameter, thickness=thickness, clearance=clearance, overreach=overreach)
     if slot_width is None:
-        slot_width = 0.4 * min(diameter, overreach)
+        slot_width = 0.35 * min(diameter, overreach)
     hole_height = clearance + overreach
     hole_displacement = slot_clearance + thickness + 0.5 * hole_height
     round_hole_bottom = back(0.5 * hole_height)(
@@ -99,3 +99,4 @@ def peg_holder(
 if __name__ == '__main__':
     scad_render_to_file(peg_holder(slot_peg_with_catch()), 'slot_peg_holder.scad')
     scad_render_to_file(peg_holder(linch_pin_peg()), 'linch_pin_peg_holder.scad')
+    scad_render_to_file(peg_holder(solid_peg()), 'solid_peg_holder.scad')
