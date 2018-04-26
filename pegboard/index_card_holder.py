@@ -1,4 +1,5 @@
 from geoscad.as_units import inches
+from geoscad.utilities import thickened_shape, raised_shape
 from solid.utils import right, up, cube, scad_render_to_file, union, left, forward, down, rotate, back
 
 from pegboard.pegs import DEFAULT_PEG_SPACING, solid_peg, DEFAULT_HOLDER_MARGIN
@@ -111,19 +112,6 @@ def open_top_box(
     return up(0.5 * outer_shape[2])(
         outer_box - inner_box)
 
-
-def thickened_shape(
-        shape,
-        thickness
-):
-    return [dim + thickness for dim in shape]
-
-
-def raised_shape(
-        shape,
-        thickness
-):
-    return [shape[0], shape[1], shape[2] + thickness]
 
 
 def box_cut_out(
