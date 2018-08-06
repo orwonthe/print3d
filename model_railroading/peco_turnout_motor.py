@@ -1,5 +1,6 @@
 from geoscad.as_units import mm, inches
-from geoscad.utilities import grounded_cube, left_right_symmetric, replicate_along_y_axis, rounded_cube, smudge
+from geoscad.utilities import grounded_cube, left_right_symmetric, replicate_along_y_axis, rounded_cube, smudge, \
+    y_symmetric_union
 from solid import scad_render_to_file, cylinder, rotate, cube, scale, mirror, intersection, union
 from solid.utils import up, right, forward, down
 
@@ -58,15 +59,6 @@ SLIDER_HEIGHT = 1.6 @ mm
 SLIDER_HOLE_HEIGHT = 3 * SLIDER_HEIGHT
 SOCKET_HOLE_DROP = 2 @ mm
 SOCKET_HOLE_HEIGHT = SWITCH_HOLE_ELEVATION + 0.001
-
-def y_symmetric_intersection(target):
-    return intersection()([target, y_symmetric(target)])
-
-def y_symmetric_union(target):
-    return union()([target, y_symmetric(target)])
-
-def y_symmetric(target):
-    return mirror([0, 1, 0])(target)
 
 def peco_motor_clamp_with_socket_hole():
     return peco_motor_clamp_with_switch_hole() - y_symmetric_union(socket_hole())

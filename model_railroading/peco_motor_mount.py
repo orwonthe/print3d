@@ -1,5 +1,5 @@
 from geoscad.as_units import mm
-from geoscad.utilities import grounded_cube
+from geoscad.utilities import grounded_cube, rounded_platter
 from solid import scad_render_to_file, cylinder, union, cube
 from solid.utils import forward, back, down, up, right, left
 
@@ -32,28 +32,6 @@ PLATTER_HEIGHT = 4 @ mm
 MOUNT_DEPRESSION = 1 @ mm
 HOLE_EXTENSION = 1 @ mm
 HOLE_HEIGHT = PLATTER_HEIGHT + 2 * HOLE_EXTENSION
-
-def rounded_platter(shape, radius, segments=16):
-    parts = []
-    diameter = 2 * radius
-    width, length, height = shape
-    short_width = width - diameter
-    short_length = length - diameter
-    if short_width > 0:
-        x_centers = [-0.5 * short_width, 0.5 * short_width]
-        parts.append(grounded_cube([short_width, length, height]))
-    else:
-        x_centers = [0]
-    if short_length > 0:
-        y_centers = [-0.5 * short_length, 0.5 * short_length]
-        parts.append(grounded_cube([width, short_length, height]))
-    else:
-        y_centers = [0]
-    corner_cylinder = cylinder(r=radius, h=height, segments=segments)
-    for x in x_centers:
-        for y in y_centers:
-            parts.append(right(x)(forward(y)(corner_cylinder)))
-    return union()(parts)
 
 
 def mount_depression():
