@@ -1,9 +1,9 @@
 from geoscad.as_units import mm, inches
 from geoscad.utilities import grounded_cube, left_right_symmetric, replicate_along_y_axis, rounded_cube, smudge
-from solid import scad_render_to_file, cylinder, rotate, cube, scale
+from solid import scad_render_to_file, cylinder, rotate, cube, scale, mirror, intersection, union
+from solid.utils import up, right, forward, down
 
 # X dimensions
-from solid.utils import up, right, forward, down
 
 CLAMP_TROUGH_WIDTH = 8.75 @ mm
 CLAMP_RUNNER_WIDTH = 2.0 @ mm
@@ -13,30 +13,32 @@ HOUSING_WIDTH = CLAMP_TROUGH_WIDTH + 2.0 * (CLAMP_GRIPPER_GAP + CLAMP_RUNNER_WID
 CLAMP_BASE_WIDTH = HOUSING_WIDTH + 2 * CLAMP_GRIP_WIDTH
 CLAMP_BUMPER_OVERHANG = CLAMP_GRIPPER_GAP + 0.4 @ mm
 CLAMP_BUMPER_WIDTH = CLAMP_GRIP_WIDTH + CLAMP_BUMPER_OVERHANG
-POLE_HOLE_WIDTH = 5.4 @ mm
+POLE_HOLE_WIDTH = 6.0 @ mm
 SWITCH_HOLE_WIDTH = 8.4 @ mm
 SWITCH_HOLDER_WIDTH = CLAMP_TROUGH_WIDTH + CLAMP_RUNNER_WIDTH
 LEAD_HOLE_PIN_CLEARANCE = 0.1 @ inches - 1.0 @ mm
 LEAD_HOLE_WIDTH = (0.2 * inches + LEAD_HOLE_PIN_CLEARANCE) @ mm
-SLIDER_WIDTH = (0.8 * CLAMP_TROUGH_WIDTH) @ mm
+SLIDER_WIDTH = (0.86 * CLAMP_TROUGH_WIDTH) @ mm
 SLIDER_HOLE_WIDTH = (POLE_HOLE_WIDTH - 0.4) @ mm
 SLIDER_RADIUS = 1.0 @ mm
+SOCKET_HOLE_WIDTH = 7.8 @ mm
 
 # Y dimensions
 CLAMP_LENGTH = 37.0 @ mm
 HOUSING_THICKNESS = 1.0 @ mm
 HOUSING_LOCATIONS = [-15.42, -3.5, 3.5, 15.42] @ mm
-POLE_HOLE_LENGTH = 6.4 @ mm
-SWITCH_HOLE_LENGTH = 8.0 @ mm
-SWITCH_HOLE_Y_OFFSET = 13.4 @ mm
+POLE_HOLE_LENGTH = 7 @ mm
+SWITCH_HOLE_LENGTH = 8.8 @ mm
+SWITCH_HOLE_Y_OFFSET = 13.0 @ mm
 SWITCH_HOLDER_LENGTH = 8.0 @ mm
 SWITCH_HOLDER_Y_OFFSET = (CLAMP_LENGTH - SWITCH_HOLDER_LENGTH) / 2
 LEAD_HOLE_LENGTH = LEAD_HOLE_PIN_CLEARANCE
 LEAD_HOLE_Y_OFFSET = ((CLAMP_LENGTH - 4.0 * mm) / 2) @ mm
-SLIDER_LENGTH = 20 @ mm
 SLIDER_HOLE_LENGTH = 2.0 @ mm
-
-SLIDER_HOLE_BIAS = 0.2 @ mm
+SLIDER_HOLE_BIAS = 1.0 @ mm
+SLIDER_LENGTH = 20 @ mm - 2 * SLIDER_HOLE_BIAS
+SOCKET_HOLE_LENGTH = 8 @ mm
+SOCKET_HOLE_Y_OFFSET = (CLAMP_LENGTH / 2) @ mm
 
 # Z dimensions
 CLAMP_BASE_HEIGHT = 2.0 @ mm
@@ -50,13 +52,37 @@ POLE_HOLE_HEIGHT = 2 * CLAMP_GRIP_HEIGHT
 CLAMP_TOP_CLIP = CLAMP_RUNNER_HEIGHT + 2.2 @ mm
 SWITCH_HOLE_HEIGHT = 3.2 @ mm
 SWITCH_HOLDER_HEIGHT = CLAMP_RUNNER_HEIGHT
+SWITCH_HOLE_ELEVATION = CLAMP_RUNNER_HEIGHT - SWITCH_HOLE_HEIGHT
 LEAD_HOLE_HEIGHT = CLAMP_RUNNER_HEIGHT
-SLIDER_HEIGHT = ((CLAMP_RUNNER_HEIGHT - CLAMP_TROUGH_HEIGHT) * 0.9) @ mm
+SLIDER_HEIGHT = 1.6 @ mm
 SLIDER_HOLE_HEIGHT = 3 * SLIDER_HEIGHT
+SOCKET_HOLE_DROP = 2 @ mm
+SOCKET_HOLE_HEIGHT = SWITCH_HOLE_ELEVATION + 0.001
+
+def y_symmetric_intersection(target):
+    return intersection()([target, y_symmetric(target)])
+
+def y_symmetric_union(target):
+    return union()([target, y_symmetric(target)])
+
+def y_symmetric(target):
+    return mirror([0, 1, 0])(target)
+
+def peco_motor_clamp_with_socket_hole():
+    return peco_motor_clamp_with_switch_hole() - y_symmetric_union(socket_hole())
+
+def socket_hole():
+    socket_hole_shape = [SOCKET_HOLE_WIDTH, SOCKET_HOLE_LENGTH, 2 * SOCKET_HOLE_HEIGHT]
+    return down(SOCKET_HOLE_HEIGHT)(forward(SOCKET_HOLE_Y_OFFSET)(
+        grounded_cube(socket_hole_shape)
+    ))
 
 
 def peco_motor_clamp_with_switch_hole():
-    return peco_turnout_motor_clamp() + switch_holder() - switch_hole() - lead_hole()
+    return peco_turnout_motor_clamp() \
+           + y_symmetric_union(switch_holder()) \
+           - y_symmetric_union(switch_hole()) \
+           - y_symmetric_union(lead_hole())
 
 
 def lead_hole():
@@ -75,7 +101,7 @@ def switch_holder():
 
 def switch_hole():
     base_shape = [SWITCH_HOLE_WIDTH, SWITCH_HOLE_LENGTH, SWITCH_HOLE_HEIGHT * 2]
-    base_elevation = CLAMP_RUNNER_HEIGHT - SWITCH_HOLE_HEIGHT
+    base_elevation = SWITCH_HOLE_ELEVATION
     base = forward(SWITCH_HOLE_Y_OFFSET)(up(base_elevation)(
         grounded_cube(base_shape))
     )
@@ -147,6 +173,8 @@ def slider():
 
 
 if __name__ == '__main__':
+    scad_render_to_file(peco_motor_clamp_with_socket_hole(), 'peco_motor_clamp_with_socket_hole.scad')
     scad_render_to_file(peco_motor_clamp_with_switch_hole(), 'peco_motor_clamp_with_switch_hole.scad')
     scad_render_to_file(slider(), 'slider.scad')
     scad_render_to_file(smudge(0.8, slider()), 'smudged_slider.scad')
+    print(SLIDER_WIDTH, SLIDER_HEIGHT)
