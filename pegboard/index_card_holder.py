@@ -13,6 +13,12 @@ DEFAULT_CUT_OUT_ELEVATION = 0.5 @ inches
 DEFAULT_PEG_HOLE_DIAMETER = 0.28 @ inches
 DEFAULT_MARGIN = DEFAULT_HOLDER_MARGIN
 
+DEFAULT_PEN_HOLDER_WIDTH = 1.8 @ inches
+DEFAULT_PEN_HOLDER_LENGTH = 1.8 @ inches
+DEFAULT_PEN_HOLDER_HEIGHT = 3.6 @ inches
+DEFAULT_PEN_HOLDER_MARGIN = 0.35 @ inches
+DEFAULT_PEN_HOLDER_THICKNESS = DEFAULT_CARD_HOLDER_THICKNESS
+
 DEFAULT_THIN_WIDTH = 0.8 @ inches
 DEFAULT_FAT_WIDTH = 1.8 @ inches
 
@@ -24,6 +30,22 @@ def fat_card_holder(width=DEFAULT_FAT_WIDTH):
 def thin_card_holder(width=DEFAULT_THIN_WIDTH):
     return index_card_holder(width)
 
+def pen_holder(
+        width=DEFAULT_PEN_HOLDER_WIDTH,
+        length=DEFAULT_PEN_HOLDER_LENGTH,
+        height=DEFAULT_PEN_HOLDER_HEIGHT,
+        thickness=DEFAULT_PEN_HOLDER_THICKNESS,
+        margin=DEFAULT_PEN_HOLDER_MARGIN,
+):
+    return index_card_holder(
+        width,
+        length=length,
+        height=height,
+        front_cut_length=None,
+        back_cut_length=None,
+        thickness=thickness,
+        margin=margin
+    )
 
 def index_card_holder(
         width,
@@ -49,7 +71,10 @@ def index_card_holder(
     holes = bottom_pegs(single_peg, shape, margin) \
             + back_pegs(single_peg, shape, margin) \
             + side_pegs(single_peg, shape, margin)
-    return box - cutouts - holes
+    result = box - holes
+    if cutouts:
+        result -= cutouts
+    return result
 
 
 def bottom_pegs(
@@ -85,7 +110,7 @@ def back_pegs(
         rotate([0, 90, 0])(
             grid_pegs(
                 single_peg,
-                centered_grid(width=shape[1], length=shape[2], margin=margin)))))
+                centered_grid(width=shape[2], length=shape[1], margin=margin)))))
 
 
 def grid_pegs(
@@ -121,6 +146,8 @@ def box_cut_out(
         front_length=None,
         back_length=None
 ):
+    if front_length is None and back_length is None:
+        return None
     params = [(0.5, front_length), (-0.5, back_length)]
     cube_width = thickness * 4
     cube_height = shape[2]
@@ -155,3 +182,4 @@ def centered_spacing(
 if __name__ == '__main__':
     scad_render_to_file(fat_card_holder(), 'fat_card_holder.scad')
     scad_render_to_file(thin_card_holder(), 'thin_card_holder.scad')
+    scad_render_to_file(pen_holder(), 'pen_holder.scad')
