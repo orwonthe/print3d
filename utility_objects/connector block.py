@@ -3,11 +3,14 @@ from typing import Optional
 
 from geoscad.as_units import mm, inches
 from geoscad.utilities import grounded_cube
-from solid import scad_render_to_file, cylinder, union, rotate, sphere, cube, mirror
+from solid import scad_render_to_file, cylinder, union, rotate, sphere, cube, mirror, intersection
 from solid.utils import up, right, forward, box_align, left, back, down
 
+USE_WOOD = True
+
 HOLE_MARGIN = 0.2 * mm
-DEFAULT_CONNECTOR_BLOCK_THICKNESS = 1.5 * mm
+DEFAULT_CONNECTOR_BLOCK_THICKNESS = 3 * mm if USE_WOOD else 1.5 * mm
+PANEL_THICKNESS = 0.8 * mm if USE_WOOD else 0.4 * mm
 
 DEFAULT_PEG_DIAMETER = 3 * mm
 DEFAULT_PEG_HOLE_DIAMETER = DEFAULT_PEG_DIAMETER + HOLE_MARGIN
@@ -19,15 +22,19 @@ CONNECTOR_PLACES = [(i, j) for i in [-1, 1] for j in [-1, 1]]
 POSITIVE_PLACES = [(i, j) for i, j in CONNECTOR_PLACES if i * j > 0]
 NEGATIVE_PLACES = [(i, j) for i, j in CONNECTOR_PLACES if i * j < 0]
 
-THUMB_HOLE_DIAMETER = 0.9 * inches
+THUMB_HOLE_DIAMETER = 1.0 * inches
 
 SWITCH_HOLE_DIAMETER = 0.25 * inches
 BUTTON_HOLE_DIAMETER = 0.27 * inches
 BUTTON_HOLE_X_OFFSETS = [8.2 * mm, -3 * mm]
 BUTTON_HOLE_Y_OFFSETS = [3 * mm, -3 * mm]
 
+GROOVE_DIAMETER = 2 * mm
+GROOVE_OFFSET = 7.5 * mm
+
 LED_HOLE_DIAMETER = 5.3 * mm
-LED_OFFSET = 0.5 * 0.78 * inches
+LED_OFFSET = 0.5 * 0.80 * inches
+CROSSED_LED_OFFSET = LED_OFFSET + GROOVE_DIAMETER
 BUTTON_LED_X_OFFSETS = [-11.5 * mm, 4.2 * mm]
 BUTTON_LED_Y_OFFSETS = [-0.2 * mm, 11.5 * mm]
 
@@ -35,36 +42,46 @@ SWITCH_CLEAT_WIDTH = 1.0 * mm
 SWITCH_CLEAT_LENGTH = 2.5 * mm
 SWITCH_CLEAT_OFFSET = 6 * mm
 
-GROOVE_DIAMETER = 2 * mm
-GROOVE_OFFSET = 7.5 * mm
-
 INSERT_HEIGHT = GROOVE_DIAMETER
 TAB_HEIGHT = 2 * INSERT_HEIGHT
 TAB_WIDTH = GROOVE_DIAMETER
 TAB_LENGTH = 2 * GROOVE_DIAMETER
 
-INSERT_THICKNESS = TAB_WIDTH - 0.8 * mm
+INSERT_THICKNESS = TAB_WIDTH - 0.4 * mm
 INSERT_TAB_HEIGHT = INSERT_HEIGHT + DEFAULT_CONNECTOR_BLOCK_THICKNESS
 INSERT_TAB_LENGTH = TAB_LENGTH - 0.8 * mm
-INSERT_SIZES = ['turnout_left', 'turnout_right', 'short', 'medium', 'long']
+INSERT_SIZES = ['cross', 'turnout_left', 'turnout_right', 'short', 'medium', 'long']
+
+
+def save_as_scad(thing, filename):
+    output_file = f'/home/willy/print_output/{filename}'
+    scad_render_to_file(thing, output_file)
 
 
 def main():
-    cube_size = 1.25 * inches
+    cube_size = (1 + 1 / 3) * inches
+    switched_paneling = 'hatched'
+    switchless_panelling = 'thin'
     for insert_sizing in INSERT_SIZES:
-        scad_render_to_file(groove_insert(cube_size, insert_sizing), f'{insert_sizing}_insert.scad')
-    scad_render_to_file(turnout_block(cube_size), 'turnout_right.scad')
-    scad_render_to_file(turnout_block(cube_size, left_hand=True), 'turnout_left.scad')
-    scad_render_to_file(diagonal_block(cube_size), 'diagonal_block.scad')
-    scad_render_to_file(diagonal_block(cube_size, True), 'double_diagonal_block.scad')
-    scad_render_to_file(empty_block(cube_size), 'empty_block.scad')
-    scad_render_to_file(panel_block(cube_size), 'panel_block.scad')
-    scad_render_to_file(panel_block(cube_size, True), 'crossed_block.scad')
+        save_as_scad(groove_insert(cube_size, insert_sizing), f'insert_{insert_sizing}.scad')
+
+        save_as_scad(empty_cube(cube_size, switchless_panelling), 'cube_empty.scad')
+        save_as_scad(straight_cube(cube_size, switchless_panelling), 'cube_straight.scad')
+        save_as_scad(diagonal_cube(cube_size, switchless_panelling, doubled=False), 'cube_diagonal.scad')
+        save_as_scad(diagonal_cube(cube_size, switchless_panelling, doubled=True), 'cube_double_diagonal.scad')
+        save_as_scad(orthogonal_cube(cube_size, switchless_panelling, crossed=True, block=False), 'cube_crossed.scad')
+
+        save_as_scad(turnout_cube(cube_size, switched_paneling, left_hand=True), 'cube_turnout_left.scad')
+        save_as_scad(turnout_cube(cube_size, switched_paneling), 'cube_turnout_right.scad')
+        save_as_scad(orthogonal_cube(cube_size, switched_paneling, crossed=True, block=False),
+                     'cube_block_crossed.scad')
+        save_as_scad(orthogonal_cube(cube_size, switched_paneling), 'cube_block.scad')
 
 
 def groove_insert(cube_size, insert_sizing):
     assert insert_sizing in INSERT_SIZES
-    is_diagonal = not insert_sizing == 'long'
+    is_diagonal = not insert_sizing in ['long', 'cross']
+    is_cross = insert_sizing == 'cross'
     is_turn_out = 'turnout' in insert_sizing
     is_short = insert_sizing == 'short'
     is_right_handed_turnout = is_turn_out and 'right' in insert_sizing
@@ -81,10 +98,17 @@ def groove_insert(cube_size, insert_sizing):
         insert_length = cube_size
         limiter = None
 
+    tab = right((insert_length - INSERT_TAB_HEIGHT) / 2)(cube([INSERT_TAB_LENGTH, INSERT_TAB_HEIGHT, INSERT_THICKNESS]))
+    if is_cross:
+        insert_length = cube_size / 2 + GROOVE_OFFSET - GROOVE_DIAMETER / 2
     insert = cube([insert_length, INSERT_HEIGHT, INSERT_THICKNESS])
     if limiter:
         insert *= limiter
-    tab = right((insert_length - INSERT_TAB_HEIGHT) / 2)(cube([INSERT_TAB_LENGTH, INSERT_TAB_HEIGHT, INSERT_THICKNESS]))
+    if is_cross:
+        pole_length = cube_size - insert_length
+        pole_offset = cube_size / 2 - GROOVE_OFFSET - GROOVE_DIAMETER / 2
+        pole = right(pole_offset)(cube([INSERT_THICKNESS, INSERT_HEIGHT, pole_length]))
+        insert += pole
     result = insert + tab
     if is_turn_out:
         result = left(INSERT_THICKNESS)(result)
@@ -93,7 +117,7 @@ def groove_insert(cube_size, insert_sizing):
     return result
 
 
-def turnout_block(cube_size, left_hand=False):
+def turnout_cube(cube_size, paneling, left_hand=False):
     grooving = grooves(cube_size)
     diagonal_grooves = grooves(cube_size, diagonal=True, turnout=True)
     leds = turnout_led_holes(cube_size)
@@ -103,23 +127,44 @@ def turnout_block(cube_size, left_hand=False):
         leds = mirror([1, 0, 0])(leds)
         button_holes = mirror([1, 0, 0])(button_holes)
     holes = leds + grooving + diagonal_grooves + button_holes
-    return empty_block(cube_size) - holes
+    return plain_cube(cube_size, paneling) - holes
 
 
-def panel_block(cube_size, crossed=False):
+def straight_cube(cube_size, paneling):
+    return plain_cube(cube_size, paneling) - grooves(cube_size)
+
+
+def orthogonal_cube(cube_size, paneling, crossed=False, block=True):
     grooving = grooves(cube_size)
     if crossed:
         grooving += rotate(90, [0, 0, 1])(grooving)
-    holes = toggle_switch_hole(cube_size) + block_led_holes(cube_size) + grooving
-    return empty_block(cube_size) - holes
+        led_offset = CROSSED_LED_OFFSET
+    else:
+        led_offset = LED_OFFSET
+    if block:
+        holes = toggle_switch_hole(cube_size) + block_led_holes(cube_size, led_offset) + grooving
+    else:
+        holes = grooving
+    return plain_cube(cube_size, paneling) - holes
 
 
-def diagonal_block(cube_size, doubled=False):
-    return empty_block(cube_size) - grooves(cube_size, diagonal=True, doubled=doubled)
+def diagonal_cube(cube_size, paneling, doubled=False):
+    return plain_cube(cube_size, paneling) - grooves(cube_size, diagonal=True, doubled=doubled)
 
 
-def empty_block(cube_size):
-    return sphere_connector_block(cube_size) - thumb_holes(cube_size)
+def empty_cube(
+        cube_size,
+        paneling,
+):
+    return plain_cube(cube_size, paneling)
+
+
+def plain_cube(
+        cube_size,
+        paneling,
+):
+    block = sphere_connector_block(cube_size, paneling)
+    return block
 
 
 def thumb_holes(cube_size):
@@ -130,6 +175,32 @@ def thumb_holes(cube_size):
     y_hole = rotate(90, [0, 1, 0])(thumb_hole_cylinder)
     return up(cube_size / 2)(x_hole + y_hole)
 
+
+def edging(cube_size, thickness):
+    octogonal_angle = math.radians(22.5)
+    span = THUMB_HOLE_DIAMETER * math.cos(octogonal_angle)
+    rise = THUMB_HOLE_DIAMETER * math.sin(octogonal_angle)
+    trim_size = math.sqrt(0.5) * thickness
+    edging_cube = forward(span / 2)(
+        rotate(90, [0, 1, 0])(
+            rotate(45, [0, 0, 1])(
+                cube([trim_size, trim_size, rise], center=True)
+            )
+        )
+    )
+    edging = right(cube_size / 2 - thickness / 2)(
+        rotate(90, [0, 1, 0])(
+            union()([
+                rotate(45 * angle_index, [0, 0, 1])(edging_cube)
+                for angle_index in range(8)
+            ])
+        )
+    )
+    quad_edging = union()([
+        rotate(90*index)(edging)
+        for index in range(4)
+    ])
+    return up(cube_size/2)(quad_edging)
 
 def turnout_led_holes(cube_size):
     single_led_hole = led_hole(cube_size)
@@ -142,9 +213,9 @@ def turnout_led_holes(cube_size):
     return union()(leds)
 
 
-def block_led_holes(cube_size):
+def block_led_holes(cube_size, led_offset):
     single_led_hole = led_hole(cube_size)
-    return left(LED_OFFSET)(single_led_hole) + right(LED_OFFSET)(single_led_hole)
+    return left(led_offset)(single_led_hole) + right(led_offset)(single_led_hole)
 
 
 def led_hole(cube_size):
@@ -203,21 +274,27 @@ def grooves(cube_size, diagonal=False, doubled=False, turnout=False):
     return groove_pair
 
 
-def groove_cylinder(cube_size):
-    groove = rotate(90, [0, 1, 0])(cylinder(r=GROOVE_DIAMETER / 2, h=cube_size * 2.1, center=True, segments=16))
+def groove_cylinder(cube_size, round_groove=False):
+    if round_groove:
+        target = cylinder(r=GROOVE_DIAMETER / 2, h=cube_size * 2.1, center=True, segments=16)
+    else:
+        target = cube([GROOVE_DIAMETER, GROOVE_DIAMETER, cube_size * 2.1], center=True)
+    groove = rotate(90, [0, 1, 0])(target)
     groove += cube([TAB_LENGTH, TAB_WIDTH, 3 * DEFAULT_CONNECTOR_BLOCK_THICKNESS], center=True)
     return groove
 
 
 def peg_connector_block(
         width: float,
-        thickness: float = DEFAULT_CONNECTOR_BLOCK_THICKNESS,
+        thickness: float,
+        paneling,
         margin=None,
 ):
     return connector_block(
         connector_peg(thickness=thickness),
         peg_connector_hole(thickness=thickness),
         width,
+        paneling,
         thickness,
         margin
     )
@@ -225,6 +302,7 @@ def peg_connector_block(
 
 def sphere_connector_block(
         width: float,
+        paneling,
         thickness: float = DEFAULT_CONNECTOR_BLOCK_THICKNESS,
         margin=None,
 ):
@@ -232,6 +310,7 @@ def sphere_connector_block(
         connector_sphere(),
         connector_sphere_hole(),
         width,
+        paneling,
         thickness,
         margin
     )
@@ -241,7 +320,8 @@ def connector_block(
         male_connector,
         female_connector,
         width: float,
-        thickness: float = DEFAULT_CONNECTOR_BLOCK_THICKNESS,
+        paneling,
+        thickness,
         margin=None,
 ):
     if margin is None:
@@ -256,7 +336,39 @@ def connector_block(
     connector_offset = width / 2 - margin - thickness
     the_male_connectors = male_connectors(male_connector, connector_offset, width)
     the_female_connectors = female_connectors(female_connector, connector_offset, width)
-    return outer_cube - inner_cube + the_male_connectors - the_female_connectors
+    block = outer_cube
+    if paneling != 'solid':
+        block -= thumb_holes(width)
+        block += edging(width, thickness)
+        if paneling is not None:
+            assert paneling in ['thin', 'hatched']
+            span = THUMB_HOLE_DIAMETER * math.cos(math.radians(22.5))
+            outer_size = width - thickness + PANEL_THICKNESS
+            inner_size = outer_size - 2 * PANEL_THICKNESS
+            outer_panel_cube = grounded_cube([outer_size, outer_size, outer_size])
+            inner_panel_cube = cube([inner_size, inner_size, 3 * width], center=True)
+            panel = outer_panel_cube - inner_panel_cube
+            if paneling == 'hatched':
+                diamond_count = 11
+                first_diamond = int(-(diamond_count + 1) / 2)
+                last_diamond = int(1 + (diamond_count + 1) / 2)
+                diamond_spacing = span / diamond_count
+                diamond_width = 0.7 * diamond_spacing
+                diamond_offset = ((1 + diamond_count) % 2) * diamond_spacing / 2
+                diamond = cube([diamond_width, diamond_width, 2 * width], center=True)
+                diamonds = rotate(45, [0, 0, 1])(union()([
+                    right(diamond_offset + i * diamond_spacing)(forward(diamond_offset + j * diamond_spacing)(diamond))
+                    for i in range(first_diamond, last_diamond)
+                    for j in range(first_diamond, last_diamond)
+                ]))
+                clipped_diamonds = diamonds * cube([span, span, 3 * width], center=True)
+                crossed_diamonds = rotate(90, [1, 0, 0])(clipped_diamonds) + rotate(90, [0, 1, 0])(clipped_diamonds)
+                raised_diamonds = up(width / 2)(crossed_diamonds)
+                panel -= raised_diamonds
+
+            block += panel
+
+    return block - inner_cube  + the_male_connectors - the_female_connectors
 
 
 def connector_peg(
