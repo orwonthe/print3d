@@ -3,7 +3,7 @@ from typing import Optional
 
 from geoscad.as_units import mm, inches
 from geoscad.utilities import grounded_cube
-from solid import scad_render_to_file, cylinder, union, rotate, sphere, cube, mirror, intersection
+from solid import scad_render_to_file, cylinder, union, rotate, sphere, cube, mirror
 from solid.utils import up, right, forward, box_align, left, back, down
 
 USE_WOOD = True
@@ -38,9 +38,9 @@ CROSSED_LED_OFFSET = LED_OFFSET + GROOVE_DIAMETER
 BUTTON_LED_X_OFFSETS = [-11.5 * mm, 4.2 * mm]
 BUTTON_LED_Y_OFFSETS = [-0.2 * mm, 11.5 * mm]
 
-SWITCH_CLEAT_WIDTH = 1.0 * mm
-SWITCH_CLEAT_LENGTH = 2.5 * mm
-SWITCH_CLEAT_OFFSET = 6 * mm
+SWITCH_CLEAT_WIDTH = 1.8 * mm
+SWITCH_CLEAT_LENGTH = 2.9 * mm
+SWITCH_CLEAT_OFFSET = 5.8 * mm
 
 INSERT_HEIGHT = GROOVE_DIAMETER
 TAB_HEIGHT = 2 * INSERT_HEIGHT
@@ -60,7 +60,7 @@ def save_as_scad(thing, filename):
 
 def main():
     cube_size = (1 + 1 / 3) * inches
-    switched_paneling = 'hatched'
+    switched_paneling = 'cutout'
     switchless_panelling = 'thin'
     for insert_sizing in INSERT_SIZES:
         save_as_scad(groove_insert(cube_size, insert_sizing), f'insert_{insert_sizing}.scad')
@@ -73,7 +73,7 @@ def main():
 
         save_as_scad(turnout_cube(cube_size, switched_paneling, left_hand=True), 'cube_turnout_left.scad')
         save_as_scad(turnout_cube(cube_size, switched_paneling), 'cube_turnout_right.scad')
-        save_as_scad(orthogonal_cube(cube_size, switched_paneling, crossed=True, block=False),
+        save_as_scad(orthogonal_cube(cube_size, switched_paneling, crossed=True, block=True),
                      'cube_block_crossed.scad')
         save_as_scad(orthogonal_cube(cube_size, switched_paneling), 'cube_block.scad')
 
@@ -197,10 +197,11 @@ def edging(cube_size, thickness):
         )
     )
     quad_edging = union()([
-        rotate(90*index)(edging)
+        rotate(90 * index)(edging)
         for index in range(4)
     ])
-    return up(cube_size/2)(quad_edging)
+    return up(cube_size / 2)(quad_edging)
+
 
 def turnout_led_holes(cube_size):
     single_led_hole = led_hole(cube_size)
@@ -341,17 +342,22 @@ def connector_block(
         block -= thumb_holes(width)
         block += edging(width, thickness)
         if paneling is not None:
-            assert paneling in ['thin', 'hatched']
+            assert paneling in ['thin', 'hatched', 'cutout']
             span = THUMB_HOLE_DIAMETER * math.cos(math.radians(22.5))
             outer_size = width - thickness + PANEL_THICKNESS
             inner_size = outer_size - 2 * PANEL_THICKNESS
             outer_panel_cube = grounded_cube([outer_size, outer_size, outer_size])
             inner_panel_cube = cube([inner_size, inner_size, 3 * width], center=True)
             panel = outer_panel_cube - inner_panel_cube
-            if paneling == 'hatched':
+            if paneling in ['hatched', 'cutout']:
                 diamond_count = 11
+                if paneling == 'cutout':
+                    diamond_limit = 4.3
+                else:
+                    diamond_limit = 0
                 first_diamond = int(-(diamond_count + 1) / 2)
                 last_diamond = int(1 + (diamond_count + 1) / 2)
+                middle_diamond = int((first_diamond + last_diamond) / 2)
                 diamond_spacing = span / diamond_count
                 diamond_width = 0.7 * diamond_spacing
                 diamond_offset = ((1 + diamond_count) % 2) * diamond_spacing / 2
@@ -360,6 +366,7 @@ def connector_block(
                     right(diamond_offset + i * diamond_spacing)(forward(diamond_offset + j * diamond_spacing)(diamond))
                     for i in range(first_diamond, last_diamond)
                     for j in range(first_diamond, last_diamond)
+                    if octogonal_distance_squared(i - middle_diamond, j - middle_diamond) >= diamond_limit
                 ]))
                 clipped_diamonds = diamonds * cube([span, span, 3 * width], center=True)
                 crossed_diamonds = rotate(90, [1, 0, 0])(clipped_diamonds) + rotate(90, [0, 1, 0])(clipped_diamonds)
@@ -368,7 +375,18 @@ def connector_block(
 
             block += panel
 
-    return block - inner_cube  + the_male_connectors - the_female_connectors
+    return block - inner_cube + the_male_connectors - the_female_connectors
+
+
+OCTOGONAL_WEIGHT = math.sqrt(0.5)
+
+
+def octogonal_distance_squared(x, y):
+    ax = abs(x)
+    ay = abs(y)
+    square = max(ax, ay)
+    diamond = ax + ay
+    return max(OCTOGONAL_WEIGHT * diamond, square)
 
 
 def connector_peg(
