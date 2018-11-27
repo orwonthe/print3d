@@ -25,6 +25,8 @@ from solid.utils import up, right, forward, left, back
 # DOOR_BEAM_WIDTH = 6 * nscale_inches
 # DOOR_BEAM_BULGE = 2 * nscale_inches
 #
+from utilities.file_utilities import save_as_scad
+
 
 class SpeederHut:
     def __init__(self):
@@ -232,10 +234,6 @@ def main():
     SpeederHut().scad_ensemble()
     NarrowSpeederHut().scad_ensemble()
 
-
-def save_as_scad(thing, filename):
-    output_file = f'/home/willy/print_output/{filename}'
-    scad_render_to_file(thing, output_file)
 
 
 if __name__ == '__main__':
