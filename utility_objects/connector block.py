@@ -6,6 +6,8 @@ from geoscad.utilities import grounded_cube
 from solid import scad_render_to_file, cylinder, union, rotate, sphere, cube, mirror
 from solid.utils import up, right, forward, box_align, left, back, down
 
+from utilities.file_utilities import save_as_scad
+
 USE_WOOD = True
 
 HOLE_MARGIN = 0.2 * mm
@@ -51,11 +53,6 @@ INSERT_THICKNESS = TAB_WIDTH - 0.4 * mm
 INSERT_TAB_HEIGHT = INSERT_HEIGHT + DEFAULT_CONNECTOR_BLOCK_THICKNESS
 INSERT_TAB_LENGTH = TAB_LENGTH - 0.8 * mm
 INSERT_SIZES = ['cross', 'turnout_left', 'turnout_right', 'short', 'medium', 'long']
-
-
-def save_as_scad(thing, filename):
-    output_file = f'/home/willy/print_output/{filename}'
-    scad_render_to_file(thing, output_file)
 
 
 def main():

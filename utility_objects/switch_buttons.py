@@ -4,6 +4,8 @@ from geoscad.as_units import mm
 from solid import scad_render_to_file, cylinder, rotate
 from solid.utils import up
 
+from utilities.file_utilities import save_as_scad
+
 BASE_DIAMETER = 10 * mm
 BASE_HEIGHT = 12 * mm
 
@@ -38,12 +40,6 @@ def mounting_hole():
 def collar():
     return cylinder(r=BASE_DIAMETER / 2, h=COLLAR_THICKNESS, center=True) - cylinder(r=COLLAR_DIAMETER / 2,
                                                                                      h=BASE_HEIGHT * 2, center=True)
-
-
-def save_as_scad(thing, filename):
-    output_file = f'/users/willy/print_output/{filename}'
-    scad_render_to_file(thing, output_file)
-
 
 if __name__ == '__main__':
     main()
