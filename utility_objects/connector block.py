@@ -75,6 +75,8 @@ def main():
         save_as_scad(turnout_cube(cube_size, switched_paneling), 'cube_turnout_right.scad')
         save_as_scad(orthogonal_cube(cube_size, switched_paneling, crossed=True, block=True),
                      'cube_block_crossed.scad')
+        save_as_scad(orthogonal_cube(cube_size, switched_paneling, crossed=True, block=True, double_blocked=True),
+                     'cube_double_crossed.scad')
         save_as_scad(orthogonal_cube(cube_size, switched_paneling), 'cube_block.scad')
 
 
@@ -134,7 +136,7 @@ def straight_cube(cube_size, paneling):
     return plain_cube(cube_size, paneling) - grooves(cube_size)
 
 
-def orthogonal_cube(cube_size, paneling, crossed=False, block=True):
+def orthogonal_cube(cube_size, paneling, crossed=False, block=True, double_blocked=False):
     grooving = grooves(cube_size)
     if crossed:
         grooving += rotate(90, [0, 0, 1])(grooving)
@@ -142,7 +144,11 @@ def orthogonal_cube(cube_size, paneling, crossed=False, block=True):
     else:
         led_offset = LED_OFFSET
     if block:
-        holes = toggle_switch_hole(cube_size) + block_led_holes(cube_size, led_offset) + grooving
+        holes = toggle_switch_hole(cube_size) + block_led_holes(cube_size, led_offset)
+        if double_blocked:
+            orthogonal_holes = rotate([0,0,90])(holes)
+            holes += orthogonal_holes
+        holes += grooving
     else:
         holes = grooving
     return plain_cube(cube_size, paneling) - holes
