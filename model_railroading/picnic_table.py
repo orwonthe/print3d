@@ -3,32 +3,11 @@ import math
 from geoscad.as_units import nscale_feet, nscale_inches, AsUnits, inches
 from geoscad.utilities import grounded_cube
 from solid import scad_render_to_file, cylinder, rotate, cube, mirror, multmatrix, scale
-from solid.utils import up, right, forward, left, back, union
+from solid.utils import up, right, forward, left, back, union, down
+
+from utilities.file_utilities import save_as_scad
 
 ho_scale_inches = AsUnits(1 / 87 * inches, 'ho"') # HO Scale model railroading uses 1:87 scaling ratio.
-
-# self.beam_size = 4 * nscale_inches
-# self.plank_size = 2 * nscale_inches
-# self.table_length = 8 * 12 * nscale_inches
-# self.table_width = 4 * 12 * nscale_inches
-# self.table_height = 30 * nscale_inches
-# self.table_plank_count = 6
-# self.seat_plank_count = 2
-# self.leg_angle = 30
-# self.seat_width = 15 * nscale_inches
-
-# self.beam_under_hang = self.plank_size
-# self.merge_factor = 0.1 * nscale_inches
-# self.plank_groove = 0.5 * nscale_inches
-
-
-# self.table_beam_width = self.table_width - 2 * self.beam_under_hang
-# self.seat_height = self.table_height / 2
-# self.seat_offset_x = self.table_beam_width / 2 + self.seat_height
-# self.frame_offset_y = 0.5 * self.table_length - 18 * nscale_inches - self.beam_size - self.merge_factor
-# self.horizontal_beam_offset_y = self.frame_offset_y + self.beam_size
-
-# self.leg_offset_x = self.table_beam_width / 2 - 3 * nscale_inches
 
 BEAM_LUMBER_THICKNESS_INCHES = 4
 PLANK_LUMBER_THICKNESS_INCHES = 2
@@ -39,6 +18,9 @@ TABLE_PLANK_COUNT = 6
 SEAT_PLANK_COUNT = 2
 LEG_ANGLE_DEGREES = 30
 SEAT_WIDTH_INCHES = 15
+
+def main():
+    save_as_scad(picnic_table(add_support=True)(ho_scale_inches), 'picnic_table.scad')
 
 class picnic_table:
     def __init__(
@@ -55,6 +37,7 @@ class picnic_table:
             beam_under_hang=None,
             plank_groove=None,
             merge_factor=None,
+            add_support=False,
     ):
         if beam_under_hang is None:
             beam_under_hang = plank_size
@@ -74,9 +57,12 @@ class picnic_table:
         self.merge_factor = merge_factor
         self.plank_groove = plank_groove
         self.leg_angle = leg_angle
+        self.add_support = add_support
 
     def __call__(self, scaling=nscale_inches):
         table = self.picnic_table_top() + self.picnic_seats() + self.picnic_frame()
+        if self.add_support:
+            table += self.support()
         return scale(1 * scaling)(
             up(self.table_length/2) (
                 rotate([90, 0, 0]) (
@@ -88,6 +74,10 @@ class picnic_table:
     @property
     def table_beam_width(self):
         return self.table_width - 2 * self.beam_under_hang
+
+    @property
+    def bench_beam_width(self):
+        return self.seat_width + 2 * self.seat_offset_x - 2 * self.beam_under_hang
 
     @property
     def seat_height(self):
@@ -148,7 +138,7 @@ class picnic_table:
         return self.picnic_bench_beams() + self.picnic_table_beams() + self.leg_frame()
 
     def picnic_bench_beams(self):
-        return self.horizontal_beams(self.seat_width + 2 * self.seat_offset_x - 2 * self.beam_under_hang, self.seat_height)
+        return self.horizontal_beams(self.bench_beam_width, self.seat_height)
 
     def picnic_table_beams(self):
         return self.horizontal_beams(self.table_beam_width, self.table_height)
@@ -178,17 +168,26 @@ class picnic_table:
             )
         )
 
-
-def main():
-    save_as_scad(picnic_table()(ho_scale_inches), 'picnic_table')
-    # save_as_scad(picnic_table()(nscale_inches), 'picnic_table')
-
-
-
-
-def save_as_scad(thing, filename):
-    output_file = f'/home/willy/print_output/{filename}.scad'
-    scad_render_to_file(thing, output_file)
+    def support(self):
+        thickness = self.plank_size / 2
+        base_pad = down(thickness)(
+            grounded_cube([self.seat_width, self.table_length, thickness])
+        )
+        center_bench_pad = up(self.seat_height - self.beam_size)(
+            grounded_cube([thickness , self.table_length, self.beam_size])
+        )
+        center_offset = (self.bench_beam_width - self.beam_size)/2
+        bench_pad = up(self.seat_height - self.beam_size)(
+            grounded_cube([thickness , self.table_length, self.beam_size])
+        )
+        return (
+                left(self.seat_offset_x)(base_pad) +
+                right(self.seat_offset_x)(base_pad) +
+                left(self.bench_beam_width/2)(center_bench_pad) +
+                right(center_offset)(center_bench_pad) +
+                bench_pad +
+                up(self.beam_size)
+        )
 
 
 if __name__ == '__main__':
