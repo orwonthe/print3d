@@ -11,7 +11,7 @@ LENGTH = 68 * mm
 THICKNESS = 1.6 * mm
 
 HANDLE_WIDTH = 20 * mm
-HANDLE_HEIGHT = 2 * mm
+HANDLE_HEIGHT = 4 * mm
 HANDLE_LENGTH = 20 * mm
 
 CHOP_WIDTH = 12.6 * mm
