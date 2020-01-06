@@ -18,9 +18,12 @@ CHOP_WIDTH = 12.6 * mm
 CHOP_GAP = 2 * mm
 CHOP_HEIGHT = HEIGHT - CHOP_GAP - THICKNESS
 CHOP_LENGTH = 3 * THICKNESS
-END_RIDGE_Y = 44.7 * mm - LENGTH / 2
+END_RIDGE_DEPTH = LENGTH - 44.7 * mm
+END_RIDGE_Y = LENGTH / 2 - END_RIDGE_DEPTH / 2
+SIDE_RIDGE_THICKNESS = 12 * mm
 END_RIDGE_W = 22 * mm
-RIDGE_X = [-0.5 * END_RIDGE_W * mm, 0.5 * END_RIDGE_W * mm]
+SIDE_RIDGE_OFFSET = END_RIDGE_W + SIDE_RIDGE_THICKNESS - THICKNESS / 2
+RIDGE_X = [-0.5 * SIDE_RIDGE_OFFSET, 0.5 * SIDE_RIDGE_OFFSET]
 
 def bard_brick():
     double_thickness = 2 * THICKNESS
@@ -36,12 +39,12 @@ def bard_brick():
         )
     )
     chop = back(LENGTH / 2)(cube([CHOP_WIDTH, CHOP_LENGTH, 2 * CHOP_HEIGHT], center=True))
-    side_ridge = grounded_cube([THICKNESS, LENGTH, HEIGHT])
+    side_ridge = grounded_cube([SIDE_RIDGE_THICKNESS, LENGTH, HEIGHT])
     side_ridges = union()([
         right(x)(side_ridge)
         for x in RIDGE_X
     ])
-    end_ridge = forward(END_RIDGE_Y)(grounded_cube([END_RIDGE_W + THICKNESS, THICKNESS, HEIGHT]))
+    end_ridge = forward(END_RIDGE_Y)(grounded_cube([END_RIDGE_W + THICKNESS, END_RIDGE_DEPTH, HEIGHT]))
     brick = base - interior + handle - chop + side_ridges + end_ridge
     return mirror([0,0,1])(
         down(HEIGHT)(brick)
