@@ -8,8 +8,9 @@ from solid.utils import up, right, forward, left, back, union, down
 from utilities.file_utilities import save_as_scad
 
 INFLATION_DEFAULT = 0.05 * mm
-PLATE_DIAMETER = 3.86 * inches
-PLATE_THICKNESS = 0.27 * inches
+PLATE_DIAMETER = 3.90 * inches
+PLATE_THICKNESS = 0.28 * inches
+TOP_PLATE_THICKNESS = 0.09 * inches
 TOOL_HOLE_DIAMETER = 0.29 * inches
 TOOL_HOLE_DISPLACEMENT = 3.11 * inches
 GROOVE_THICKNESS = 0.11 * inches
@@ -23,7 +24,11 @@ TAB_ANGLE = math.asin(TAB_SINE)
 
 
 def main():
-    save_as_scad(RouterPlate()(1 * inches), 'router_plate.scad')
+    for index in range(8, 17):
+        scad_file_name = f'router_plate_{index}.scad'
+        opening_diameter = index / 8
+        print(opening_diameter, scad_file_name)
+        save_as_scad(RouterPlate()(opening_diameter * inches), scad_file_name)
 
 
 class RouterPlate:
@@ -31,19 +36,19 @@ class RouterPlate:
         self.inflation = inflation
 
     def __call__(self, opening_diameter):
-        return self.router_plate(opening_diameter) - self.center_opening(opening_diameter) - self.tool_holes()
+        plate = self.router_plate(opening_diameter) - self.center_opening(opening_diameter) - self.tool_holes()
+        return rotate(15, [0, 0, 1])(plate)
 
     def router_plate(self, opening_diameter):
         return self.top_plate() + self.inner_cylinder() + self.tabs() - self.groove_cuts()
-        # return self.top_plate() + self.tabs()
-        # return self.groove_cuts()
 
 
     def top_plate(self):
         radius = PLATE_DIAMETER / 2
-        thickness = (PLATE_THICKNESS - GROOVE_THICKNESS) / 2
-        offset = (PLATE_THICKNESS - thickness) / 2
-        return down(offset)(
+        thickness = TOP_PLATE_THICKNESS
+        height = thickness - 2 * self.inflation
+        vertical_offset = height / 2
+        return up(vertical_offset)(
             cylinder(
                 r=radius - self.inflation,
                 h=thickness - 2 * self.inflation,
@@ -52,20 +57,22 @@ class RouterPlate:
             ))
 
     def inner_cylinder(self):
-        return cylinder(
+        height = PLATE_THICKNESS - 2 * self.inflation
+        return up(height/2)(cylinder(
             r=INNER_DIAMETER / 2 - self.inflation,
-            h=PLATE_THICKNESS - 2 * self.inflation,
+            h=height,
             center=True,
             segments=64
-        )
+        ))
 
     def tab_cylinder(self):
-        return cylinder(
+        height = PLATE_THICKNESS - 2 * self.inflation
+        return up(height/2)(cylinder(
             r=TAB_DIAMETER / 2 - self.inflation,
-            h=PLATE_THICKNESS - 2 * self.inflation,
+            h=height,
             center=True,
             segments=64
-        )
+        ))
 
     def tabs(self):
         c = math.cos(TAB_ANGLE)
@@ -77,12 +84,18 @@ class RouterPlate:
         return self.tab_cylinder() * (xtabs + ytabs)
 
     def groove_cuts(self):
-        angle = -math.degrees(TAB_ANGLE)
-        side = INNER_DIAMETER + 2 * self.inflation
-        offset = INNER_DIAMETER
-        single = cube([side, side, GROOVE_THICKNESS + 2 * self.inflation], center=True)
+        steps = 10
+        delta = 1.0 / steps
+        return union()([self.single_groove_cut(delta * (1 + index)) for index in range(steps)])
+
+    def single_groove_cut(self, ratio):
+        angle = -math.degrees(TAB_ANGLE) * ratio
+        side = TAB_DIAMETER + 2 * self.inflation
+        offset = TAB_DIAMETER - ratio * GROOVE_THICKNESS
+        vertical_offset = TOP_PLATE_THICKNESS
+        single = grounded_cube([side, side, GROOVE_THICKNESS + 2 * self.inflation])
         grooves = left(offset)(single) + right(offset)(single) + forward(offset)(single) + back(offset)(single)
-        return union()([rotate(ratio * angle , v=[0, 0, 1])(grooves) for ratio in [0.5, 1]])
+        return up(vertical_offset)(rotate(angle , v=[0, 0, 1])(grooves))
 
     def center_opening(self, opening_diameter):
         return cylinder(

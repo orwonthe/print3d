@@ -8,7 +8,7 @@ from solid.utils import down, forward, back, up, right
 WIDTH = 57 * mm
 HEIGHT = 10 * mm
 LENGTH = 68 * mm
-THICKNESS = 0.6 * mm
+THICKNESS = 1.6 * mm
 
 HANDLE_WIDTH = 20 * mm
 HANDLE_HEIGHT = 2 * mm
