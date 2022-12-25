@@ -6,13 +6,32 @@ from geoscad.utilities import grounded_cube
 from solid import scad_render_to_file, cylinder, union, rotate, sphere, cube, mirror
 from solid.utils import up, right, forward, box_align, left, back, down
 
-from utilities.file_utilities import save_as_scad
+from print3d.utilities.file_utilities import save_as_scad
 
 USE_WOOD = True
 
 HOLE_MARGIN = 0.2 * mm
 DEFAULT_CONNECTOR_BLOCK_THICKNESS = 3 * mm if USE_WOOD else 1.5 * mm
 PANEL_THICKNESS = 0.8 * mm if USE_WOOD else 0.4 * mm
+
+LED_LEAD_DIAMETER = 2 * mm
+SWITCH_LEAD_DIAMETER = 3 * mm
+CIRCUIT_BOARD_TOTAL_THICKNESS = 11 * mm
+CIRCUIT_BOARD_BASE_THICKNESS = 2 * mm
+CIRCUIT_BOARD_PEDASTAL_THICKNESS = CIRCUIT_BOARD_TOTAL_THICKNESS - CIRCUIT_BOARD_BASE_THICKNESS
+
+
+CIRCUIT_BOARD_WIDTH = 1.05 * inches
+CIRCUIT_BOARD_LENGTH = 1.05 * inches
+RESISTOR_HOLE_OFFSETS = [
+    [-0.4 * inches, 0.45 * inches], [ -0.05 * inches, 0.45 * inches],
+    [-0.4 * inches, 0.35 * inches], [ -0.05 * inches, 0.35 * inches],
+    [-0.15 * inches, 0.13 * inches], [ 0.25 * inches, -0.2 * inches],
+    [-0.0 * inches, 0.2 * inches], [ 0.4 * inches, -0.13 * inches],
+    # [], [],
+]
+    # [-0.4 * inches, -0.05 * inches]
+# RESISTOR_HOLE_Y_OFFSETS = [0.4 * inches, 0.3 * inches, 0.2 * inches]
 
 DEFAULT_PEG_DIAMETER = 3 * mm
 DEFAULT_PEG_HOLE_DIAMETER = DEFAULT_PEG_DIAMETER + HOLE_MARGIN
@@ -39,6 +58,7 @@ LED_OFFSET = 0.5 * 0.80 * inches
 CROSSED_LED_OFFSET = LED_OFFSET + GROOVE_DIAMETER
 BUTTON_LED_X_OFFSETS = [-11.5 * mm, 4.2 * mm]
 BUTTON_LED_Y_OFFSETS = [-0.2 * mm, 11.5 * mm]
+BUTTON_LED_LEAD_ANGLES = [90, 0]
 
 SWITCH_CLEAT_WIDTH = 1.8 * mm
 SWITCH_CLEAT_LENGTH = 2.9 * mm
@@ -57,24 +77,96 @@ INSERT_SIZES = ['cross', 'turnout_left', 'turnout_right', 'short', 'medium', 'lo
 
 def main():
     cube_size = (1 + 1 / 3) * inches
-    switched_paneling = 'cutout'
-    switchless_panelling = 'thin'
+    # create_all(cube_size)
+    save_as_scad(circuit_board_for_turnout(cube_size, True), 'circuit_board_for_turnout_left.scad')
+    save_as_scad(circuit_board_for_turnout(cube_size, False), 'circuit_board_for_turnout_right.scad')
+
+
+def circuit_board_for_turnout(cube_size, left_hand):
+    led_lead_holes, led_pedastals = turnout_led_mount_holes(cube_size)
+    button_holes = button_switch_mount_holes(cube_size)
+    row_of_cable_holes = right(0.01 * inches)(union()(back( 0.35 * inches)(cable_holes(cube_size))))
+    top_row = (row_of_cable_holes)
+    bottom_row = back(0.1 * inches)(row_of_cable_holes)
+    holes = resistor_holes(cube_size) + led_lead_holes + button_holes + top_row + bottom_row
+    whole = (circuit_board() + led_pedastals - holes) * circuit_board_limit()
+    if left_hand:
+        whole = mirror([1, 0, 0])(whole)
+    return whole
+
+def cable_holes(cube_size):
+    single_cable_hole = cylinder(r=LED_LEAD_DIAMETER/2, h=2*cube_size, center=True, segments=16)
+    return  left(0.4 * inches)([right(index * 0.2 * inches)(single_cable_hole) for index in range(5)])
+
+def circuit_board():
+    return grounded_cube([CIRCUIT_BOARD_LENGTH, CIRCUIT_BOARD_WIDTH, CIRCUIT_BOARD_BASE_THICKNESS])
+
+def circuit_board_limit():
+    return down(CIRCUIT_BOARD_TOTAL_THICKNESS)(grounded_cube([CIRCUIT_BOARD_LENGTH, CIRCUIT_BOARD_WIDTH, 2 * CIRCUIT_BOARD_TOTAL_THICKNESS]))
+
+def turnout_led_mount_holes(cube_size):
+    led_mount_hole_pair = led_mount_holes(cube_size)
+    led_lead_holes = [
+        right(BUTTON_LED_X_OFFSETS[index])(
+            forward(BUTTON_LED_Y_OFFSETS[index])(rotate(BUTTON_LED_LEAD_ANGLES[index], [0, 0, 1])(led_mount_hole_pair))
+        )
+        for index in range(len(BUTTON_LED_Y_OFFSETS))
+    ]
+    single_pedastal = cylinder(r=BUTTON_HOLE_DIAMETER/2, h=CIRCUIT_BOARD_TOTAL_THICKNESS, segments=16)
+    led_pedastals = [
+        right(BUTTON_LED_X_OFFSETS[index])(
+            forward(BUTTON_LED_Y_OFFSETS[index])(single_pedastal)
+        )
+        for index in range(len(BUTTON_LED_Y_OFFSETS))
+    ]
+    return (union()(led_lead_holes), union()(led_pedastals))
+
+def resistor_holes(cube_size):
+    one_hole = cylinder(r=LED_LEAD_DIAMETER / 2, h=cube_size, center=True, segments=16)
+    resistor_holes = [right(x)(forward(y)(one_hole)) for (x, y) in RESISTOR_HOLE_OFFSETS]
+    return union()(resistor_holes)
+
+def button_switch_mount_holes(cube_size, add_cleat=True):
+    single_lead_cylinder = cylinder(r=SWITCH_LEAD_DIAMETER / 2, h=cube_size, center=True, segments=16)
+    hole_displacement = 0.075 * inches
+    lead_hole_pair = left(hole_displacement)(single_lead_cylinder) + right(hole_displacement)(single_lead_cylinder)
+    lead_hole_pair = rotate(-45)(lead_hole_pair)
+    button_holes = [
+        right(BUTTON_HOLE_X_OFFSETS[index])(
+            forward(BUTTON_HOLE_Y_OFFSETS[index])(
+               lead_hole_pair
+            )
+        )
+        for index in range(len(BUTTON_HOLE_Y_OFFSETS))
+    ]
+    return union()(button_holes)
+
+
+def led_mount_holes(cube_size):
+    one_hole = cylinder(r=LED_LEAD_DIAMETER / 2, h=cube_size, center=True, segments=16)
+    hole_displacement = 0.05 * inches
+    return left(hole_displacement)(one_hole) + right(hole_displacement)(one_hole)
+
+
+def create_all(cube_size):
+    switched_paneling = 'cutout'  # Sides of cubes will have cut outs for finger access to switch and LED wiring.
+    switchless_panelling = 'thin'  # No wiring in cube so use thin walls without cutouts.
     for insert_sizing in INSERT_SIZES:
         save_as_scad(groove_insert(cube_size, insert_sizing), f'insert_{insert_sizing}.scad')
 
-        save_as_scad(empty_cube(cube_size, switchless_panelling), 'cube_empty.scad')
-        save_as_scad(straight_cube(cube_size, switchless_panelling), 'cube_straight.scad')
-        save_as_scad(diagonal_cube(cube_size, switchless_panelling, doubled=False), 'cube_diagonal.scad')
-        save_as_scad(diagonal_cube(cube_size, switchless_panelling, doubled=True), 'cube_double_diagonal.scad')
-        save_as_scad(orthogonal_cube(cube_size, switchless_panelling, crossed=True, block=False), 'cube_crossed.scad')
+    save_as_scad(empty_cube(cube_size, switchless_panelling), 'cube_empty.scad')
+    save_as_scad(straight_cube(cube_size, switchless_panelling), 'cube_straight.scad')
+    save_as_scad(diagonal_cube(cube_size, switchless_panelling, doubled=False), 'cube_diagonal.scad')
+    save_as_scad(diagonal_cube(cube_size, switchless_panelling, doubled=True), 'cube_double_diagonal.scad')
+    save_as_scad(orthogonal_cube(cube_size, switchless_panelling, crossed=True, block=False), 'cube_crossed.scad')
 
-        save_as_scad(turnout_cube(cube_size, switched_paneling, left_hand=True), 'cube_turnout_left.scad')
-        save_as_scad(turnout_cube(cube_size, switched_paneling), 'cube_turnout_right.scad')
-        save_as_scad(orthogonal_cube(cube_size, switched_paneling, crossed=True, block=True),
-                     'cube_block_crossed.scad')
-        save_as_scad(orthogonal_cube(cube_size, switched_paneling, crossed=True, block=True, double_blocked=True),
-                     'cube_double_crossed.scad')
-        save_as_scad(orthogonal_cube(cube_size, switched_paneling), 'cube_block.scad')
+    save_as_scad(turnout_cube(cube_size, switched_paneling, left_hand=True), 'cube_turnout_left.scad')
+    save_as_scad(turnout_cube(cube_size, switched_paneling), 'cube_turnout_right.scad')
+    save_as_scad(orthogonal_cube(cube_size, switched_paneling, crossed=True, block=True),
+                 'cube_block_crossed.scad')
+    save_as_scad(orthogonal_cube(cube_size, switched_paneling, crossed=True, block=True, double_blocked=True),
+                 'cube_double_crossed.scad')
+    save_as_scad(orthogonal_cube(cube_size, switched_paneling), 'cube_block.scad')
 
 
 def groove_insert(cube_size, insert_sizing):
@@ -143,7 +235,7 @@ def orthogonal_cube(cube_size, paneling, crossed=False, block=True, double_block
     if block:
         holes = toggle_switch_hole(cube_size) + block_led_holes(cube_size, led_offset)
         if double_blocked:
-            orthogonal_holes = rotate([0,0,90])(holes)
+            orthogonal_holes = rotate([0, 0, 90])(holes)
             holes += orthogonal_holes
         holes += grooving
     else:
@@ -156,15 +248,15 @@ def diagonal_cube(cube_size, paneling, doubled=False):
 
 
 def empty_cube(
-        cube_size,
-        paneling,
+    cube_size,
+    paneling,
 ):
     return plain_cube(cube_size, paneling)
 
 
 def plain_cube(
-        cube_size,
-        paneling,
+    cube_size,
+    paneling,
 ):
     block = sphere_connector_block(cube_size, paneling)
     return block
@@ -231,9 +323,9 @@ def toggle_switch_hole(cube_size):
     return main_hole + cleat_opening()
 
 
-def button_switch_holes(cube_size):
+def button_switch_holes(cube_size, add_cleat=True):
     hole_cylinder = cylinder(r=BUTTON_HOLE_DIAMETER / 2, h=cube_size, center=True, segments=16)
-    cylinder_with_cleat = hole_cylinder + cleat_opening()
+    cylinder_with_cleat = hole_cylinder + cleat_opening() if add_cleat else hole_cylinder
     button_holes = [
         right(BUTTON_HOLE_X_OFFSETS[index])(
             forward(BUTTON_HOLE_Y_OFFSETS[index])(
@@ -289,10 +381,10 @@ def groove_cylinder(cube_size, round_groove=False):
 
 
 def peg_connector_block(
-        width: float,
-        thickness: float,
-        paneling,
-        margin=None,
+    width: float,
+    thickness: float,
+    paneling,
+    margin=None,
 ):
     return connector_block(
         connector_peg(thickness=thickness),
@@ -305,10 +397,10 @@ def peg_connector_block(
 
 
 def sphere_connector_block(
-        width: float,
-        paneling,
-        thickness: float = DEFAULT_CONNECTOR_BLOCK_THICKNESS,
-        margin=None,
+    width: float,
+    paneling,
+    thickness: float = DEFAULT_CONNECTOR_BLOCK_THICKNESS,
+    margin=None,
 ):
     return connector_block(
         connector_sphere(),
@@ -321,12 +413,12 @@ def sphere_connector_block(
 
 
 def connector_block(
-        male_connector,
-        female_connector,
-        width: float,
-        paneling,
-        thickness,
-        margin=None,
+    male_connector,
+    female_connector,
+    width: float,
+    paneling,
+    thickness,
+    margin=None,
 ):
     if margin is None:
         margin = DEFAULT_PEG_DIAMETER
@@ -393,9 +485,9 @@ def octogonal_distance_squared(x, y):
 
 
 def connector_peg(
-        peg_diameter: float = DEFAULT_PEG_DIAMETER,
-        peg_length: Optional[float] = None,
-        thickness: float = DEFAULT_CONNECTOR_BLOCK_THICKNESS
+    peg_diameter: float = DEFAULT_PEG_DIAMETER,
+    peg_length: Optional[float] = None,
+    thickness: float = DEFAULT_CONNECTOR_BLOCK_THICKNESS
 ):
     if peg_length is None:
         peg_length = peg_diameter
@@ -403,20 +495,20 @@ def connector_peg(
 
 
 def peg_connector_hole(
-        hole_diameter: float = DEFAULT_PEG_HOLE_DIAMETER,
-        thickness: float = DEFAULT_CONNECTOR_BLOCK_THICKNESS
+    hole_diameter: float = DEFAULT_PEG_HOLE_DIAMETER,
+    thickness: float = DEFAULT_CONNECTOR_BLOCK_THICKNESS
 ):
     return cylinder(r=hole_diameter / 2, h=3 * thickness, center=True, segments=16)
 
 
 def connector_sphere(
-        diameter: float = DEFAULT_SPHERE_DIAMETER,
+    diameter: float = DEFAULT_SPHERE_DIAMETER,
 ):
     return sphere(r=diameter / 2, segments=16)
 
 
 def connector_sphere_hole(
-        diameter: float = DEFAULT_SPHERE_HOLE_DIAMETER,
+    diameter: float = DEFAULT_SPHERE_HOLE_DIAMETER,
 ):
     return sphere(r=diameter / 2, segments=16)
 
